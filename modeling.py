@@ -97,7 +97,7 @@ class DSBenchModeling(Environment):
 
         self.sandbox_settings = SandboxSettings(
             environment="GeneralReasoning/DSBench",
-            image="us-central1-docker.pkg.dev/indigo-idea-457514-b5/environments/dsbench-agent:latest",
+            image="generalreasoning/dsbench-agent:latest",
             machine_size="1:2",
             block_network=False,
             bucket_config=SandboxBucketConfig(
