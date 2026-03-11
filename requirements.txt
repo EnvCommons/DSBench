@@ -1,0 +1,5 @@
+pydantic>=2.6.0
+openai
+openreward
+pandas
+openpyxl

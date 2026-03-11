@@ -1,0 +1,27 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update && apt install -y \
+    software-properties-common \
+    ca-certificates \
+    curl \
+    python3 \
+    python3-pip \
+    git \
+    git-lfs \
+    unzip \
+    wget \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workdir
+RUN chmod -R 777 /workdir/
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+RUN uv venv --python 3.11
+
+COPY computer_requirements.txt /workdir/requirements.txt
+RUN uv pip install -r requirements.txt && \
+    uv pip install pip
+RUN rm requirements.txt
