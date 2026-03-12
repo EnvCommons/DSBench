@@ -4,7 +4,7 @@
 
 ## Description
 
-DSBench is an environment for evaluating data science agents on realistic data analysis and data modeling tasks. It is based on the [DSBench benchmark](https://arxiv.org/abs/2409.07703) (ICLR 2025), which collects tasks from ModelOff financial modeling competitions and Kaggle machine learning challenges.
+DSBench is an ORS environment for evaluating data science agents on realistic data analysis and data modeling tasks. It is based on the [DSBench benchmark](https://arxiv.org/abs/2409.07703) (ICLR 2025), which collects tasks from ModelOff financial modeling competitions and Kaggle machine learning challenges.
 
 The environment provides two variants:
 
