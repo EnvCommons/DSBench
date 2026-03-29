@@ -96,7 +96,7 @@ class DSBenchModeling(Environment):
             raise ValueError("OpenReward API key must be provided via secrets parameter")
 
         self.sandbox_settings = SandboxSettings(
-            environment="GeneralReasoning/DSBench",
+            environment="Liqiang/DSBench",
             image="generalreasoning/dsbench-agent:latest",
             machine_size="1:2",
             block_network=False,
