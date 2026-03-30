@@ -22,6 +22,28 @@ if os.path.exists('/orwd_data'):
 else:
     DATA_DIR = Path(__file__).parent / "analysis_data"
 
+_CACHED_TASKS: list[JSONObject] | None = None
+_EXCEL_CACHE: dict[tuple, str] = {}
+
+
+def _parse_excel_files(excel_paths: list[Path]) -> str:
+    """Parse Excel files and return formatted content string. Cached across sessions."""
+    cache_key = tuple(str(p) for p in sorted(excel_paths))
+    if cache_key in _EXCEL_CACHE:
+        return _EXCEL_CACHE[cache_key]
+    content = ""
+    for excel_path in excel_paths:
+        xls = pd.ExcelFile(excel_path)
+        sheets = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
+        combined_text = ""
+        for sheet_name, df in sheets.items():
+            assert isinstance(df, pd.DataFrame)
+            sheet_text = df.to_string(index=False)
+            combined_text += f"Sheet name: {sheet_name}\n{sheet_text}\n\n"
+        content += f"The excel file {excel_path.name} is: " + combined_text
+    _EXCEL_CACHE[cache_key] = content
+    return content
+
 
 class TaskSpec(BaseModel):
     id: str
@@ -46,21 +68,13 @@ class DSBenchAnalysis(Environment):
             raise ValueError("OpenAI API key must be provided via secrets parameter")
         self.client = openai.AsyncClient(api_key=api_key)
 
+        # Pre-parse Excel content (cached across sessions sharing same files)
+        self._excel_content = _parse_excel_files(self.validated.excel_paths) if self.validated.excel_paths else ""
+
     async def get_prompt(self) -> list[TextBlock]:
         prompt = """You are a data analyst. I will give you a background introduction and data analysis question. You must answer the question."""
-        if self.validated.excel_paths:
-            excel_content = ""
-            for excel_path in self.validated.excel_paths:
-                xls = pd.ExcelFile(excel_path)
-                sheets = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
-                combined_text = ""
-                for sheet_name, df in sheets.items():
-                    assert isinstance(df, pd.DataFrame)
-                    sheet_text = df.to_string(index=False)
-                    combined_text += f"Sheet name: {sheet_name}\n{sheet_text}\n\n"
-                excel_content += f"The excel file {excel_path.name} is: " + combined_text
-            prompt += f"The workbook is detailed as follows. {excel_content} \n"
-
+        if self._excel_content:
+            prompt += f"The workbook is detailed as follows. {self._excel_content} \n"
         prompt += f"The introduction is detailed as follows. \n {self.validated.introduction} \n"
         prompt += f"The questions are detailed as follows. \n {self.validated.question}"
         return [TextBlock(text=prompt)]
@@ -110,8 +124,11 @@ class DSBenchAnalysis(Environment):
 
     @classmethod
     def list_tasks(cls, split: str) -> list[JSONObject]:
+        global _CACHED_TASKS
         if split != "test":
             raise ValueError(f"Unknown split: {split}")
+        if _CACHED_TASKS is not None:
+            return _CACHED_TASKS
 
         tasks = []
         for task_family in DATA_METADATA:
@@ -123,13 +140,16 @@ class DSBenchAnalysis(Environment):
             assert isinstance(task_family["questions"], list)
             assert isinstance(task_family["answers"], list)
             assert len(task_family["questions"]) == len(task_family["answers"])
+
+            # Glob once per task family (shared across all questions)
+            image_files: list[Path] = sorted(list(task_dir.glob("*.png")) + list(task_dir.glob("*.jpg")))
+            excel_files: list[Path] = sorted(list(task_dir.glob("*.xlsx")) + list(task_dir.glob("*.xlsb")) + list(task_dir.glob("*.xlsm")))
+            excel_files = [file for file in excel_files if "answer" not in file.name.lower()]
+
             for question_id, answer in zip(task_family["questions"], task_family["answers"]):
                 question_file = task_dir / f"{question_id}.txt"
                 with open(question_file, "r") as f:
                     question = f.read()
-                image_files: list[Path] = list(task_dir.glob("*.png")) + list(task_dir.glob("*.jpg"))
-                excel_files: list[Path] = list(task_dir.glob("*.xlsx")) + list(task_dir.glob("*.xlsb")) + list(task_dir.glob("*.xlsm"))
-                excel_files = [file for file in excel_files if "answer" not in file.name.lower()]
 
                 tasks.append(TaskSpec(
                     id=f"analysis_{task_family['id']}_{question_id}",
@@ -139,6 +159,7 @@ class DSBenchAnalysis(Environment):
                     image_paths=image_files,
                     excel_paths=excel_files,
                 ).model_dump())
+        _CACHED_TASKS = tasks
         return tasks
 
     @classmethod

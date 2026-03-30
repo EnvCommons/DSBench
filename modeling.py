@@ -45,6 +45,8 @@ TASKS_IDS_TO_IGNORE = [
     "covid19-global-forecasting-week-5",
 ]
 
+_CACHED_TASKS: list[JSONObject] | None = None
+
 
 class TaskSpec(BaseModel):
     id: str
@@ -175,8 +177,11 @@ class DSBenchModeling(Environment):
 
     @classmethod
     def list_tasks(cls, split: str) -> list[JSONObject]:
+        global _CACHED_TASKS
         if split != "test":
             raise ValueError(f"Unknown split: {split}")
+        if _CACHED_TASKS is not None:
+            return _CACHED_TASKS
 
         tasks = []
         task_files = sorted([i for i in (DATA_DIR / "task").iterdir() if i.is_file() and i.suffix == ".txt"])
@@ -204,6 +209,7 @@ class DSBenchModeling(Environment):
                 baseline_score=baseline_score,
                 ground_truth_score=ground_truth_score,
             ).model_dump())
+        _CACHED_TASKS = tasks
         return tasks
 
     @classmethod
